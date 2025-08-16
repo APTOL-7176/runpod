@@ -63,7 +63,7 @@ RUN mkdir -p /weights/instantmesh /weights/wonder3d
 COPY scripts /app/scripts
 COPY handler.py /app/handler.py
 COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/start.sh && sed -i 's/\r$//' /app/start.sh
 
 ENV BLENDER_USER_SCRIPTS=/root/.config/blender/${BLENDER_VERSION}/scripts
 RUN mkdir -p ${BLENDER_USER_SCRIPTS}
