@@ -10,25 +10,30 @@
 - 반픽셀화(anti-pixel): Bicubic 업스케일 + Bilateral smoothing으로 픽셀 계단 제거
 - 투명 배경: rembg로 재-매팅하여 RGBA PNG 출력
 
-## 호출 입력 포맷
-```json
-{
-  "image_url": "https://example.com/sprite.png",
-  "score_threshold": 0.20,
-  "mask_dilate": 12,
-  "tpose_scope": "upper_body",
-  "guidance_scale": 7.5,
-  "steps": 34,
-  "controlnet_scales": [1.35, 0.5],
-  "out_long_side": 1024,
-  "pixel_preserve": false,
-  "prompt": "Genshin Impact style, anime cel shading, smooth soft gradients, clean thin lineart, high quality, detailed face, no weapons, natural relaxed hands, strict T-pose, character centered, soft vibrant colors, white studio lighting",
-  "negative_prompt": "weapon, gun, sword, knife, rifle, spear, bow, axe, staff, grenade, bomb, pixelated, 8-bit, mosaic, dithering, voxel, lowres, jpeg artifacts, oversharp, deformed hands, extra fingers, missing fingers, text, watermark, harsh shadows, photorealistic"
-}
+## 로컬 빌드
+```bash
+docker build -t ghcr.io/<owner>/runpod-weapon-tpose-genshin:latest .
+```
+
+## Runpod 배포
+1) Runpod → Serverless → New Endpoint
+- Container Image: `ghcr.io/<owner>/runpod-weapon-tpose-genshin:latest`
+- GPU: A10G 24GB 권장
+- Env(선택): `OWL_VIT_ID, CLIPSEG_ID, SD15_INPAINT_ID, CN_OPENPOSE_ID, CN_LINEART_ID, DEFAULT_PROMPT, DEFAULT_NEGATIVE`
+
+2) 테스트 호출
+```bash
+curl -X POST https://api.runpod.ai/v2/<endpoint_id>/runsync \
+  -H "Authorization: Bearer <runpod_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"image_url": "https://example.com/sprite.png"}}'
 ```
 
 ## 팁
-- 픽셀풍을 확실히 없애려면 `pixel_preserve`는 반드시 false로 두세요(기본 false).
-- 더 강한 T-포즈 고정을 원하면 `controlnet_scales[0]`(openpose)을 1.5~1.8로 올려보세요.
-- 라인이 너무 강하면 `controlnet_scales[1]`(lineart)을 0.3~0.5로 낮추세요.
-- 무기 잔흔이 남으면 `mask_dilate`를 16~24로 올리거나 `steps`를 40 내외로 증가.
+- 픽셀풍을 확실히 없애려면 `pixel_preserve=false` 유지(기본값)
+- T-포즈 고정 강화: `controlnet_scales[0]`을 1.5~1.8로 상향
+- 라인이 거치면: `controlnet_scales[1]`을 0.3~0.5로 조정
+- 무기 잔흔: `mask_dilate` 16~24 또는 `steps` 40 내외
+
+## 주의
+- 일부 모델은 최초 실행 시 다운로드가 필요합니다(콜드스타트 지연). HuggingFace 토큰이 필요한 경우 Runpod 환경변수 `HUGGINGFACE_HUB_TOKEN`을 설정하세요.
