@@ -5,12 +5,21 @@ from PIL import Image
 from rembg import remove as rembg_remove
 import runpod
 
+# ---- HF fast transfer 안전 가드: 패키지 유무에 따라 자동 전환 ----
+try:
+    if os.environ.get("HF_HUB_ENABLE_HF_TRANSFER") is None:
+        import importlib.util
+        has_fast = importlib.util.find_spec("hf_transfer") is not None
+        os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1" if has_fast else "0"
+except Exception:
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+# -----------------------------------------------------------------
+
 INSTANTMESH_REPO = "/app/repos/InstantMesh"
 WONDER3D_REPO = "/app/repos/Wonder3D"
 BLENDER_BIN = shutil.which("blender") or "/usr/local/bin/blender"
 
-# Optional: set your checkpoint paths via env or mount to /weights
-INSTANTMESH_CKPT = os.environ.get("INSTANTMESH_CKPT", "/weights/instantmesh")  # folder/ckpt as repo expects
+INSTANTMESH_CKPT = os.environ.get("INSTANTMESH_CKPT", "/weights/instantmesh")
 WONDER3D_CKPT = os.environ.get("WONDER3D_CKPT", "/weights/wonder3d")
 
 def download_image(image_url: str, out_path: str) -> str:

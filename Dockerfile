@@ -6,7 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_DISABLE_TELEMETRY=1 \
     RP_VERBOSE=1 \
     BLENDER_VERSION=3.6.8 \
-    BLENDER_DIR=/opt/blender
+    BLENDER_DIR=/opt/blender \
+    HF_HUB_ENABLE_HF_TRANSFER=0   # 기본은 끔(핸들러에서 자동 전환)
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \

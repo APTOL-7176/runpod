@@ -10,5 +10,8 @@ pygltflib
 scipy
 rembg==2.0.57
 onnxruntime-gpu==1.18.1
+# HF hub + fast transfer
+huggingface-hub>=0.23.4
+hf_transfer>=0.1.8
 # CLI helpers
 click
