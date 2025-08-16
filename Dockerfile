@@ -7,20 +7,34 @@ ENV DEBIAN_FRONTEND=noninteractive \
     RP_VERBOSE=1 \
     BLENDER_VERSION=3.6.8 \
     BLENDER_DIR=/opt/blender \
-    HF_HUB_ENABLE_HF_TRANSFER=0   # 기본은 끔(핸들러에서 자동 전환)
+    HF_HUB_ENABLE_HF_TRANSFER=0
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip git wget ca-certificates git-lfs \
+    python3 python3-pip git wget curl ca-certificates git-lfs \
     libgl1 libglib2.0-0 libxrender1 libsm6 libxext6 \
-    libgomp1 ffmpeg unzip && \
-    rm -rf /var/lib/apt/lists/* && git lfs install
+    libgomp1 ffmpeg unzip xz-utils \
+    && rm -rf /var/lib/apt/lists/* && git lfs install
 
-# Blender (headless)
-RUN mkdir -p ${BLENDER_DIR} && \
-    wget -q https://mirror.clarkson.edu/blender/release/Blender${BLENDER_VERSION%.*}/blender-${BLENDER_VERSION}-linux-x64.tar.xz -O /tmp/blender.txz && \
-    tar -xJf /tmp/blender.txz -C ${BLENDER_DIR} --strip-components=1 && \
-    ln -s ${BLENDER_DIR}/blender /usr/local/bin/blender
+# Blender (headless) with retry + fallback mirror
+RUN set -eux; \
+    mkdir -p "${BLENDER_DIR}"; \
+    BL_MAJOR_MINOR="$(echo ${BLENDER_VERSION} | awk -F. '{print $1"."$2}')"; \
+    BL_BASENAME="blender-${BLENDER_VERSION}-linux-x64"; \
+    URL_PRIMARY="https://download.blender.org/release/Blender${BL_MAJOR_MINOR}/${BL_BASENAME}.tar.xz"; \
+    URL_MIRROR="https://mirror.clarkson.edu/blender/release/Blender${BL_MAJOR_MINOR}/${BL_BASENAME}.tar.xz"; \
+    for U in "$URL_PRIMARY" "$URL_MIRROR"; do \
+      echo "Downloading: $U"; \
+      if curl -fL --retry 5 --retry-delay 3 --connect-timeout 20 -o /tmp/blender.txz "$U"; then \
+        break; \
+      fi; \
+      echo "Download failed from $U, trying next..."; \
+    done; \
+    ls -lh /tmp/blender.txz; \
+    # Extract (needs xz-utils)
+    tar -xJf /tmp/blender.txz -C "${BLENDER_DIR}" --strip-components=1; \
+    ln -sf "${BLENDER_DIR}/blender" /usr/local/bin/blender; \
+    blender -v
 
 WORKDIR /app
 
@@ -34,26 +48,21 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 COPY requirements.txt .
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-# Clone and set up 3D repos
-# InstantMesh
+# 3D repos
 RUN git clone --depth=1 https://github.com/TencentARC/InstantMesh /app/repos/InstantMesh && \
     python3 -m pip install --no-cache-dir -r /app/repos/InstantMesh/requirements.txt
-# Wonder3D
 RUN git clone --depth=1 https://github.com/3DTopia/wonder3d /app/repos/Wonder3D || true && \
     if [ -f /app/repos/Wonder3D/requirements.txt ]; then \
       python3 -m pip install --no-cache-dir -r /app/repos/Wonder3D/requirements.txt; \
     fi
 
-# Download example checkpoints (placeholders: replace with your own if needed)
-# You may need HF token for some weights; mount via env HF_TOKEN.
-# ADD or RUN commands for ckpts can be added here if public.
+# Weights mount points
 RUN mkdir -p /weights/instantmesh /weights/wonder3d
 
 # App code
 COPY scripts /app/scripts
 COPY handler.py /app/handler.py
 
-# Ensure Blender addons (Rigify, glTF) can be enabled in headless
 ENV BLENDER_USER_SCRIPTS=/root/.config/blender/${BLENDER_VERSION}/scripts
 RUN mkdir -p ${BLENDER_USER_SCRIPTS}
 
