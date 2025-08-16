@@ -7,7 +7,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     RP_VERBOSE=1 \
     BLENDER_VERSION=3.6.8 \
     BLENDER_DIR=/opt/blender \
-    HF_HUB_ENABLE_HF_TRANSFER=0
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    CUDA_VISIBLE_DEVICES=0
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -59,11 +60,12 @@ RUN git clone --depth=1 https://github.com/3DTopia/wonder3d /app/repos/Wonder3D 
 # Weights mount points
 RUN mkdir -p /weights/instantmesh /weights/wonder3d
 
-# App code
 COPY scripts /app/scripts
 COPY handler.py /app/handler.py
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 ENV BLENDER_USER_SCRIPTS=/root/.config/blender/${BLENDER_VERSION}/scripts
 RUN mkdir -p ${BLENDER_USER_SCRIPTS}
 
-CMD ["python3", "-u", "handler.py"]
+CMD ["/bin/bash", "/app/start.sh"]
