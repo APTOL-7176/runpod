@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 ffmpeg unzip xz-utils \
     && rm -rf /var/lib/apt/lists/* && git lfs install
 
-# Blender (headless) with retry + fallback mirror
+# Blender (headless)
 RUN set -eux; \
     mkdir -p "${BLENDER_DIR}"; \
     BL_MAJOR_MINOR="$(echo ${BLENDER_VERSION} | awk -F. '{print $1"."$2}')"; \
@@ -32,18 +32,23 @@ RUN set -eux; \
       echo "Download failed from $U, trying next..."; \
     done; \
     ls -lh /tmp/blender.txz; \
-    # Extract (needs xz-utils)
     tar -xJf /tmp/blender.txz -C "${BLENDER_DIR}" --strip-components=1; \
     ln -sf "${BLENDER_DIR}/blender" /usr/local/bin/blender; \
     blender -v
 
 WORKDIR /app
 
-# PyTorch CUDA 12.1
+# PyTorch CUDA 12.1 (PINNED VERSIONS)  ← 여기 블록을 교체하세요
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
-      torch torchvision torchaudio && \
-    python3 -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu121 xformers==0.0.25.post1
+      torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 && \
+    python3 -m pip install --no-cache-dir xformers==0.0.27.post2 && \
+    python3 - <<'PY' \
+import torch, torchvision; \
+print('torch =', torch.__version__); \
+print('torchvision =', torchvision.__version__); \
+print('has register_fake?', hasattr(getattr(torch,'library',None),'register_fake'))
+PY
 
 # App deps
 COPY requirements.txt .
@@ -57,8 +62,21 @@ RUN git clone --depth=1 https://github.com/3DTopia/wonder3d /app/repos/Wonder3D 
       python3 -m pip install --no-cache-dir -r /app/repos/Wonder3D/requirements.txt; \
     fi
 
+# Re-pin torch/vision after repo reqs (some reqs may downgrade them)
+RUN python3 -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
+      --upgrade --no-deps torch==2.4.1+cu121 torchvision==0.19.1+cu121 torchaudio==2.4.1+cu121 && \
+    python3 - <<'PY' \
+import torch, torchvision; \
+print('FINAL torch =', torch.__version__); \
+print('FINAL torchvision =', torchvision.__version__); \
+print('has register_fake?', hasattr(getattr(torch,'library',None),'register_fake'))
+PY
+
 # Weights mount points
 RUN mkdir -p /weights/instantmesh /weights/wonder3d
+
+# (선택) rigging용 Blender 스크립트가 있다면 복사
+# COPY blender_scripts /app/blender_scripts
 
 COPY scripts /app/scripts
 COPY handler.py /app/handler.py
